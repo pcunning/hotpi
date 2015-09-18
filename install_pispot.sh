@@ -10,23 +10,6 @@
 
 #user configuration options
 
-#network details for the wireless network adaptor
-IP4_INT=wlan0
-IP4_CONF_TYPE=static
-IP4_ADDRESS=192.168.2.1
-IP4_NETMASK=255.255.255.0
-
-IP4_NETWORK=${IP4_ADDRESS%?}0
-IP4_BROADCAST=${IP4_ADDRESS%?}255
-IP4_GATEWAY=${IP4_ADDRESS}
-
-#dhcp server configuration details
-IP4_DNS1=8.8.8.8.8
-IP4_DNS2=4.4.4.4
-IP4_STARTADDRESS=${IP4_ADDRESS%?}2
-IP4_ENDADDRESS=${IP4_ADDRESS%?}50
-
-
 GREEN='\e[00;32m'
 DEFT='\e[00m'
 RED='\e[00;31m'
@@ -84,36 +67,24 @@ fi
 fi
 
 }
-installPackage req_files/hostapd
 installPackage req_files/isc-dhcp-server
 
 #installed, so now for configuration
-#set up the wlan interface, first back up current and then write a new one
-
-mv /etc/network/interfaces /etc/network/interfaces.bak
-
-echo "
-    #auto eth0
-    #iface eth0 inet dhcp
-    auto eth0
-    iface eth0 inet static
-    address 192.168.1.1
-    netmask 255.255.255.0
-    broadcast 192.168.1.255
-    
-    auto $IP4_INT
-    iface $IP4_INT inet $IP4_CONF_TYPE
-    address $IP4_ADDRESS
-    netmask $IP4_NETMASK
-    broadcast $IP4_BROADCAST
-    gateway $IP4_GATEWAY">>/etc/network/interfaces
-
-
+#set up files in boot.
+#ssid.txt for ssid info, hotspot.txt for hotspot info
+touch /boot/ssid.txt
+touch /boot/hotspot.txt
+#cho "#place config as <ssid>,<psk>">/boot/ssid.txt
+echo "testssid,testcode">>/boot/ssid.txt
+echo "pispot,192.168.2.1,pispotcode">/boot/hotspot.txt
+#cho "#place config as <hotspot name>,<ip address of gateway>,<psk>...this line must be at the bottom of this file :D">>/boot/hotspot.txt
 
 #set up hostapd and configuration
+#first copy hostapd v2 and then copy hostapd v 0.8
 
-mv /usr/sbin/hostapd /usr/sbin/hostapd.other
+cp ./req_files/hostapd2/hostapd /usr/sbin/hostapd.other
 cp ./req_files/new-hostapd/hostapd8 /usr/sbin/hostapd8
+mkdir -p /etc/hostapd
 cp /etc/hostapd/hostapd.conf /etc/hostapd/hostapd.conf.bak
 cp ./hostapd.conf /etc/hostapd/
 chown root:root /etc/hostapd/hostapd.conf
@@ -129,11 +100,20 @@ sudo sed -i '/INTERFACES=""/c\INTERFACES="wlan0"' /etc/default/isc-dhcp-server
 cp /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.bak
 cp ./dhcpd.conf /etc/dhcp/dhcpd.conf
 chown root:root /etc/dhcp/dhcpd.conf
+cp /etc/dhcp/dhclient.conf /etc/dhcp/dhclient.conf.bak
+cp ./dhclient.conf /etc/dhcp/dhclient.conf
+chown root:root /etc/dhcp/dhclient.conf
+
 
 #kill any autostart
 
 update-rc.d -f hostapd remove
 update-rc.d -f isc-dhcp-server remove
+
+#setup ifplugd
+
+rm /etc/default/ifplugd
+cp ifplugd /etc/default/ifplugd
 
 #intstall the start script
 mkdir /usr/share/pispot
@@ -144,3 +124,6 @@ chown -R root:root /usr/share/pispot
 #sort out autoboot
 echo "Setting up autostart of the system"
 sed -i '$i/usr/share/pispot/start_pispot.sh' /etc/rc.local
+
+#reboot the pi
+reboot
